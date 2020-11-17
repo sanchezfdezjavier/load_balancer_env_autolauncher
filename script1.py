@@ -48,7 +48,12 @@ if __name__ == '__main__':
     # Minor bug, it is possible to specify server number if the value is 2
     optional_without_create()
 
-    print(ORDER, NSERVERS)
+    # Save data in config file
+    config_file = open("cp1.cfg", 'w')
+    config_file.write("num_serv=" + str(NSERVERS))
+    config_file.close()
+
+    print("Finished")
 
 
 
