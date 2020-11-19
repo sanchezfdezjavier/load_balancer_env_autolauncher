@@ -6,6 +6,7 @@ from subprocess import call
 import argparse
 from lxml import etree
 import logging
+import sys
 
 #Constat definitions
 ORDER_MODES = ["create", "start", "stop", "release"]
@@ -55,6 +56,23 @@ def create_xml_template(xml_template, nservers=1):
         sx_xml_template_name = "s%i.xml" % i
         call(["cp", xml_template, sx_xml_template_name])
 
+def create():
+    # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
+    qemu_create_cow(NSERVERS)
+    #Create XML server templates
+    create_xml_template(XML_TEMPLATE, NSERVERS)
+    #Create XML C1 client template
+    create_xml_template(XML_TEMPLATE)
+
+def start():
+    pass
+
+def stop():
+    pass
+
+def release():
+    pass
+
 
 
 if __name__ == '__main__':
@@ -83,11 +101,12 @@ if __name__ == '__main__':
     logger.debug(ORDER)
     logger.debug(NSERVERS)
 
-    # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
-    qemu_create_cow(NSERVERS)
-    #Create XML server templates
-    create_xml_template(XML_TEMPLATE, NSERVERS)
-    #Create XML C1 client template
-    create_xml_template(XML_TEMPLATE)
+    # Call the suitable function depending on user ORDER input {create/start/stop/release}
+    command_function = ORDER
+    getattr(sys.modules[__name__], "%s" % command_function)()
+
+
+
+
 
     print("End")
