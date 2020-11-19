@@ -5,6 +5,7 @@ import sys
 from subprocess import call
 import argparse
 from lxml import etree
+import logging
 
 #Constat definitions
 ORDER_MODES = ["create", "start", "stop", "release"]
@@ -40,7 +41,12 @@ def optional_without_create():
 
 def qemu_create_cow(nservers):
      for i in range(1, nservers + 1):
-     	call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "s{}.qcow2".format(i)])
+        sx_image_name = "s%i.qcow2" % i
+     	call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", sx_image_name])
+
+     call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "lb.qcow2"])
+     call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "c1.qcow2"])
+     
      print("cow images successfully created")
 
 
@@ -50,7 +56,7 @@ if __name__ == '__main__':
     NSERVERS = check_servers_input_value(ARGS['serversNumber'])
 
     # Minor bug, it is possible to specify server number if the value is 2
-    optional_without_create()
+    #optional_without_create()
 
     # Save data in config file
     config_file = open("cp1.cfg", 'w')
@@ -60,6 +66,15 @@ if __name__ == '__main__':
 
     config = open("cp1.cfg", "r")
     NSERVERS = int(config.readlines()[0][-1] )
+
+
+    # loggin config
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger()
+    logger.debug("DEBUG MODE")
+    # Debug trace
+    logger.debug(ORDER)
+    logger.debug(NSERVERS)
 
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
     qemu_create_cow(NSERVERS)
