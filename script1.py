@@ -8,6 +8,11 @@ from lxml import etree
 import logging
 import sys
 
+# WARNING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111
+# This code does not work if you don't have installed the following dependecies:
+#  lxml                 --> sudo apt-get install python3-lxml
+#  qemu images support  --> sudo apt-get install qemu
+
 #Constat definitions
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
@@ -56,12 +61,32 @@ def create_xml_template(xml_template, nservers=1):
         sx_xml_template_name = "s%i.xml" % i
         call(["cp", xml_template, sx_xml_template_name])
 
+def setup_xml(xml_file):
+    # Load xml file
+    file = etree.parse(xml_file)
+    # Finds the root tag
+    root = file.getroot()
+
+    # Change VM name tag: takes the xml_file name without the extension
+    name_tag = root.find("name")
+    name_tag.text = xml_file.split('.')[0]
+
+    # Change brige type of source tag to 'virbr0'
+    source_tag = root.find("./devices/interface/source")
+    source_tag.set("bridge", "virbr0")
+    
+    # Save the changes
+    file_saved = open(xml_file, 'w')
+    file_saved.write(etree.tostring(root, pretty_print=True))
+    file_saved.close()
+
+
 def create():
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
     qemu_create_cow(NSERVERS)
-    #Create XML server templates
+    # Create XML server templates
     create_xml_template(XML_TEMPLATE, NSERVERS)
-    #Create XML C1 client template
+    # Create XML C1 client template
     create_xml_template(XML_TEMPLATE)
 
 def start():
@@ -104,9 +129,5 @@ if __name__ == '__main__':
     # Call the suitable function depending on user ORDER input {create/start/stop/release}
     command_function = ORDER
     getattr(sys.modules[__name__], "%s" % command_function)()
-
-
-
-
 
     print("End")
