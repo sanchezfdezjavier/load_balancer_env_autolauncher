@@ -11,6 +11,7 @@ import logging
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
 MAX_SERVERS = 5
+XML_TEMPLATE = "plantilla-vm-p3.xml"
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -46,8 +47,14 @@ def qemu_create_cow(nservers):
 
      call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "lb.qcow2"])
      call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "c1.qcow2"])
-     
+
      print("cow images successfully created")
+
+def create_xml_template(xml_template, nservers=1):
+    for i in range(1, nservers+1):
+        sx_xml_template_name = "s%i.xml" % i
+        call(["cp", xml_template, sx_xml_template_name])
+
 
 
 if __name__ == '__main__':
@@ -78,5 +85,9 @@ if __name__ == '__main__':
 
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
     qemu_create_cow(NSERVERS)
+    #Create XML server templates
+    create_xml_template(XML_TEMPLATE, NSERVERS)
+    #Create XML C1 client template
+    create_xml_template(XML_TEMPLATE)
 
     print("End")
