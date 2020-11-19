@@ -22,7 +22,6 @@ def setup_xml(xml_file):
 
 setup_xml("tests.xml")
 # from lxml import etree
-
 # tree = etree.parse('books.xml')
 
 # new_entry = etree.fromstring('''<book category="web" cover="paperback">

@@ -18,6 +18,8 @@ ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
 MAX_SERVERS = 5
 XML_TEMPLATE = "plantilla-vm-p3.xml"
+BRIDGE = "virbr0"
+IMAGE_SOURCE_FILE = "/cdps-vm-base-p3.qcow2"
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -72,8 +74,12 @@ def setup_xml(xml_file):
     name_tag.text = xml_file.split('.')[0]
 
     # Change brige type of source tag to 'virbr0'
-    source_tag = root.find("./devices/interface/source")
-    source_tag.set("bridge", "virbr0")
+    bridge_source_tag = root.find("./devices/interface/source")
+    bridge_source_tag.set("bridge", BRIDGE)
+
+    # Change qcow2 image source file with IMAGE_SOURCE_FILE
+    image_source_tag = root.find('./devices/disk/source')
+    image_source_tag.set("file", IMAGE_SOURCE_FILE)
     
     # Save the changes
     file_saved = open(xml_file, 'w')
@@ -88,6 +94,8 @@ def create():
     create_xml_template(XML_TEMPLATE, NSERVERS)
     # Create XML C1 client template
     create_xml_template(XML_TEMPLATE)
+    # XML s1 config
+    setup_xml('s1.xml')
 
 def start():
     pass
@@ -113,7 +121,7 @@ if __name__ == '__main__':
     config_file.write("num_serv=" + str(NSERVERS))
     config_file.close()
 
-
+    # Reading the config file
     config = open("cp1.cfg", "r")
     NSERVERS = int(config.readlines()[0][-1] )
 
