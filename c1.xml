@@ -1,5 +1,5 @@
 <domain type="kvm">
-  <name>s2</name>
+  <name>c1</name>
   <memory>1048576</memory>
   <currentMemory>1048576</currentMemory>
   <vcpu>2</vcpu>

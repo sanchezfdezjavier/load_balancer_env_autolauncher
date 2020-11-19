@@ -20,6 +20,7 @@ MAX_SERVERS = 5
 XML_TEMPLATE = "plantilla-vm-p3.xml"
 BRIDGE = "virbr0"
 IMAGE_SOURCE_FILE = "/cdps-vm-base-p3.qcow2"
+CLIENT_NAME = "c1"
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -52,6 +53,8 @@ def qemu_create_cow(nservers):
      for i in range(1, nservers + 1):
         sx_image_name = "s%i.qcow2" % i
      	call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", sx_image_name])
+        # Saves the created servers names in server_names in main thread
+        server_names.append("s%i" % i)
 
      call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "lb.qcow2"])
      call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "c1.qcow2"])
@@ -93,9 +96,12 @@ def create():
     # Create XML server templates
     create_xml_template(XML_TEMPLATE, NSERVERS)
     # Create XML C1 client template
-    create_xml_template(XML_TEMPLATE)
-    # XML s1 config
-    setup_xml('s1.xml')
+    call(["cp", XML_TEMPLATE, CLIENT_NAME + ".xml"])
+    # XML setup for each server
+    for s in server_names:
+        setup_xml("%s.xml" % s)
+    #XML C1 setup
+    setup_xml(CLIENT_NAME + ".xml")
 
 def start():
     pass
@@ -112,6 +118,7 @@ if __name__ == '__main__':
     ARGS = parse_Arguments().__dict__
     ORDER = check_order_input_value(ARGS['order'])
     NSERVERS = check_servers_input_value(ARGS['serversNumber'])
+    server_names = []
 
     # Minor bug, it is possible to specify server number if the value is 2
     #optional_without_create()
@@ -137,5 +144,7 @@ if __name__ == '__main__':
     # Call the suitable function depending on user ORDER input {create/start/stop/release}
     command_function = ORDER
     getattr(sys.modules[__name__], "%s" % command_function)()
+
+    print(server_names)
 
     print("End")
