@@ -4,8 +4,7 @@ import os
 import sys
 from subprocess import call
 import argparse
-# import lxml
-
+from lxml import etree
 
 #Constat definitions
 ORDER_MODES = ["create", "start", "stop", "release"]
@@ -39,6 +38,11 @@ def optional_without_create():
         print("Wrong input. Server number on create option not expected")
         quit()
 
+def qemu_create_cow(nservers):
+     for i in range(1, nservers + 1):
+     	call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "s{}.qcow2".format(i)])
+     print("cow images successfully created")
+
 
 if __name__ == '__main__':
     ARGS = parse_Arguments().__dict__
@@ -53,7 +57,11 @@ if __name__ == '__main__':
     config_file.write("num_serv=" + str(NSERVERS))
     config_file.close()
 
-    print("Finished")
 
+    config = open("cp1.cfg", "r")
+    NSERVERS = int(config.readlines()[0][-1] )
 
+    # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
+    qemu_create_cow(NSERVERS)
 
+    print("End")
