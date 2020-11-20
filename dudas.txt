@@ -1,4 +1,10 @@
 1. Hay que hacer que se instalen las dependencias que estamos usando?
-    1.1 lxml
-    1.2 qemu commands
+    1.1 lxml            --> 
+    1.2 qemu commands   --> 
+    1.3 virt-manager    --> 
+    1.4 xterm           --> sudo apt-get install xterm
 2. Donde se supone que va a estar la imagen fuente desde al cual vamos a crear las instancias?
+
+3. Aparentemente se puede hacer sudo programaticamente desde dentro del script sin introducir la contraseña del usuario
+no se si puede tener que ver con los permisos que tenga el archivo, pero hay que verificar que esto funciona en diferentes ordenadores
+

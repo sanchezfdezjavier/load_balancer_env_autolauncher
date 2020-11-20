@@ -19,8 +19,9 @@ MIN_SERVERS = 1
 MAX_SERVERS = 5
 XML_TEMPLATE = "plantilla-vm-p3.xml"
 BRIDGE = "virbr0"
-IMAGE_SOURCE_FILE = "/cdps-vm-base-p3.qcow2"
+IMAGE_SOURCE_FILE = "/home/javier/Desktop/load_balancer_env_autolauncher/cdps-vm-base-p3.qcow2"
 CLIENT_NAME = "c1"
+LOAD_BALANCER_NAME = "lb"
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -61,10 +62,15 @@ def qemu_create_cow(nservers):
 
      print("cow images successfully created")
 
-def create_xml_template(xml_template, nservers=1):
+def create_xml_templates(xml_template, nservers=1):
+    # Creates servers xml templates from s1 to sn
     for i in range(1, nservers+1):
         sx_xml_template_name = "s%i.xml" % i
         call(["cp", xml_template, sx_xml_template_name])
+    # Create XML C1 client template
+    call(["cp", XML_TEMPLATE, CLIENT_NAME + ".xml"])
+    # Create XML lb load balancer template
+    call(["cp", XML_TEMPLATE, LOAD_BALANCER_NAME + ".xml"])
 
 def setup_xml(xml_file):
     # Load xml file
@@ -89,19 +95,46 @@ def setup_xml(xml_file):
     file_saved.write(etree.tostring(root, pretty_print=True))
     file_saved.close()
 
+def virsh_define(xml_file):
+    call(["sudo", "virsh", "define", xml_file])
+
+def virsh_start(vm_name):
+    call(["sudo", "virsh", "start", vm_name])
+
+def virsh_undefine(vm_name):
+    call(["sudo", "virsh", "undefine", vm_name])
+
+# Opens the 
+def virsh_console(vm):
+    command = "xterm -rv -sb -rightbar -fa monospace -fs 10 -title 's1' -e 'sudo virsh console s1'"
+    command_list = command.split(" ")
+    command_list[-1] = vm + "'"
+    call(command_list)
 
 def create():
-    # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow
+    # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow and c1.qcow2 and lb.qcow2
     qemu_create_cow(NSERVERS)
-    # Create XML server templates
-    create_xml_template(XML_TEMPLATE, NSERVERS)
-    # Create XML C1 client template
-    call(["cp", XML_TEMPLATE, CLIENT_NAME + ".xml"])
+    # Create XML server, c1 client and load balancer templates
+    create_xml_templates(XML_TEMPLATE, NSERVERS)
+
     # XML setup for each server
     for s in server_names:
         setup_xml("%s.xml" % s)
-    #XML C1 setup
+    # XML setup for the client
     setup_xml(CLIENT_NAME + ".xml")
+    # XML setup for load balancer
+    setup_xml(LOAD_BALANCER_NAME + ".xml")
+
+    # virsh define for all servers
+    for server in server_names:
+        virsh_define(server + ".xml")
+
+    # virsh define for client
+    virsh_define(CLIENT_NAME + ".xml")
+    # virsh define for load balancer
+    virsh_define(LOAD_BALANCER_NAME + ".xml")
+
+    print("All VMs defined successfully!")
 
 def start():
     pass
