@@ -9,3 +9,4 @@
 3. Aparentemente se puede hacer sudo programaticamente desde dentro del script sin introducir la contraseña del usuario
 no se si puede tener que ver con los permisos que tenga el archivo, pero hay que verificar que esto funciona en diferentes ordenadores
 
+4.Dicen que el comando no puede ser interactivo, pero eso incluye tener meter la contraseña de usuario?(sudo)
