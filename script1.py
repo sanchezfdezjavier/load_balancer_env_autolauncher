@@ -8,20 +8,27 @@ from lxml import etree
 import logging
 import sys
 
+from os import listdir
+from os.path import isfile, join
+
 # WARNING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111
 # This code does not work if you don't have installed the following dependecies:
 #  lxml                 --> sudo apt-get install python3-lxml
 #  qemu images support  --> sudo apt-get install qemu
 
 #Constat definitions
+CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
 MAX_SERVERS = 5
 XML_TEMPLATE = "plantilla-vm-p3.xml"
+IMAGE_NAME = "cdps-vm-base-p3.qcow2"
 BRIDGE = "virbr0"
-IMAGE_SOURCE_FILE = "/home/javier/Desktop/load_balancer_env_autolauncher/cdps-vm-base-p3.qcow2"
+IMAGE_SOURCE_PATH = "/home/javier/Desktop/load_balancer_env_autolauncher/" + IMAGE_NAME
 CLIENT_NAME = "c1"
 LOAD_BALANCER_NAME = "lb"
+LAN1_NAME = "LAN1"
+LAN2_NAME = "LAN2"
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -86,9 +93,9 @@ def setup_xml(xml_file):
     bridge_source_tag = root.find("./devices/interface/source")
     bridge_source_tag.set("bridge", BRIDGE)
 
-    # Change qcow2 image source file with IMAGE_SOURCE_FILE
+    # Change qcow2 image source file with IMAGE_SOURCE_PATH
     image_source_tag = root.find('./devices/disk/source')
-    image_source_tag.set("file", IMAGE_SOURCE_FILE)
+    image_source_tag.set("file", IMAGE_SOURCE_PATH)
     
     # Save the changes
     file_saved = open(xml_file, 'w')
@@ -110,6 +117,45 @@ def virsh_console(vm):
     command_list = command.split(" ")
     command_list[-1] = vm + "'"
     call(command_list)
+
+def brctl_addbr(lan_name):
+    # sudo brctl addbr <lan name>
+    call(["sudo", "brctl", "addbr", lan_name])
+    
+def lan_up(lan_name):
+    # sudo ifconfig <lan name> up
+    call(["sudo", "ifconfig", lan_name, "up"])
+
+def bridges_config():
+    # sudo brctl addbr LAN1_NAME
+    brctl_addbr(LAN1_NAME)
+    # sudo ifconfig LAN1_NAME up
+    lan_up(LAN1_NAME)
+
+    # sudo brctl addbr LAN2_NAME
+    brctl_addbr(LAN2_NAME)
+    # sudo ifconfig addbr LAN2_NAME
+    lan_up(LAN2_NAME)
+
+def get_files_to_delete(my_path):
+    # Get a list containing all file names in the directory
+    to_return = [f for f in listdir(my_path) if isfile(join(my_path, f))]
+    
+    files_to_preserve = ["script1.py", ".gitignore", "tests.py", "cp1.cfg", "dudas.txt", "README.md"]
+    for file_name in files_to_preserve:
+        to_return.remove(file_name)
+
+    # Get all .qcow images file names except the source, IMAGE_NAME
+    for file_name in to_return:
+        if (file_name.endswith(".qcow2") and (file_name == IMAGE_NAME)):
+            to_return.remove(file_name)
+
+    # Get all .xml config files, except the template, XML_TEMPLATE
+    for file_name in to_return:
+        if(file_name.endswith(".xml") and (file_name == XML_TEMPLATE)):
+            to_return.remove(file_name)
+
+    return to_return
 
 def create():
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow and c1.qcow2 and lb.qcow2
@@ -134,7 +180,10 @@ def create():
     # virsh define for load balancer
     virsh_define(LOAD_BALANCER_NAME + ".xml")
 
-    print("All VMs defined successfully!")
+    # Bridges creation and config for both viratual networks
+    bridges_config()
+
+    print("Create successfully")
 
 def start():
     pass
@@ -143,7 +192,15 @@ def stop():
     pass
 
 def release():
-    pass
+    # Stops the environment before deleting the files
+    stop()
+    
+    # Deletes the environment files creted by the option create
+    files_to_delete = get_files_to_delete(CURRENT_PATH)
+    for file_name in files_to_delete:
+        call(["rm", file_name])
+    
+    print("Files successfully deleted")
 
 
 
