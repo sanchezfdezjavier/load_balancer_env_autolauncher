@@ -8,6 +8,8 @@ from lxml import etree
 import logging
 import sys
 
+import shutil
+
 from os import listdir
 from os.path import isfile, join
 
@@ -16,7 +18,7 @@ from os.path import isfile, join
 #  lxml                 --> sudo apt-get install python3-lxml
 #  qemu images support  --> sudo apt-get install qemu
 
-#Constat definitions
+# Constat definitions
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
@@ -107,16 +109,16 @@ def virsh_define(xml_file):
 
 def virsh_start(vm_name):
     call(["sudo", "virsh", "start", vm_name])
+    print(vm_name + "started!")
 
 def virsh_undefine(vm_name):
     call(["sudo", "virsh", "undefine", vm_name])
 
-# Opens the 
-def virsh_console(vm):
-    command = "xterm -rv -sb -rightbar -fa monospace -fs 10 -title 's1' -e 'sudo virsh console s1'"
-    command_list = command.split(" ")
-    command_list[-1] = vm + "'"
-    call(command_list)
+def virsh_shutdown(vm_name):
+    call(["sudo", "virsh", "shutdown", vm_name])
+
+def open_VM_console(vm_name):
+    call(["virt-viewer", vm_name])
 
 def brctl_addbr(lan_name):
     # sudo brctl addbr <lan name>
@@ -185,11 +187,40 @@ def create():
 
     print("Create successfully")
 
+def get_VM_config_files(vm_name):
+    current_path = os.getcwd()
+    TMP_DIR_NAME = "tmp_config_files"
+    TMP_DIR_PATH= current_path + '/' + TMP_DIR_NAME
+
+    try:
+        print(TMP_DIR_PATH + '/' + 'hostname')
+        os.mkdir(TMP_DIR_PATH)
+        config_file = open(TMP_DIR_PATH + '/' + 'hostname', 'w')
+        config_file.write(vm_name)
+        config_file.close()
+    except OSError:
+        print("Fail while creating the temporal VM config files")
+    else:
+        print("Files successfully created")
+
+    
+
+    # Delete all temporal files
+    #shutil.rmtree(current_path + '/' + TMP_DIR_NAME)
+    #print("Files successfully deleted")
+
 def start():
-    pass
+    print(server_names)
+    for server in server_names:
+        virsh_start(server)
 
 def stop():
-    pass
+    VMs_running = server_names
+
+    for vm in VMs_running:
+        virsh_shutdown(vm)
+
+
 
 def release():
     # Stops the environment before deleting the files

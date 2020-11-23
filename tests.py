@@ -8,32 +8,35 @@ import argparse
 from lxml import etree
 import logging
 import sys
+import tempfile
 
 from os import listdir
 from os.path import isfile, join
 import time
+import shutil
 
 VM_USERNAME = "cdps"
 VM_PASSWORD = "cdps"
 
+current_path = os.getcwd()
 
-def start_and_login(vm):
-    call(["sudo", "virsh", "start", vm])
-    # call(["sudo", "virsh", "console", vm])
+#print("The current directory is:\n" + current_path)
 
-    login_process = subprocess.Popen(["sudo", "virsh", "console" ,"s1"])
-    print("Happens while running")
-    login_process.communicate(input="\n" + VM_USERNAME + "\n" +  VM_PASSWORD + "\n")
-    call(["\n"])
-    time.sleep(7)
-    call(["cdps"])
-    #call([VM_USERNAME])
-    #call([VM_PASSWORD])
-    # call(["sudo", "halt", "-p"])
+def get_VM_config_files(vm_name):
+    current_path = os.getcwd()
+    TMP_DIR_NAME = "tmp_config_files"
+    TMP_DIR_PATH= current_path + '/' + TMP_DIR_NAME
 
-print(start_and_login("s1"))
+    try:
+        print(TMP_DIR_PATH + '/' + 'hostname')
+        os.mkdir(TMP_DIR_PATH)
+        config_file = open(TMP_DIR_PATH + '/' + 'hostname', 'w')
+        config_file.write(vm_name)
+        config_file.close()
+    except OSError:
+        print("Fail while creating the temporal VM config files")
+    else:
+        print("Files successfully created")
 
 
-# p = subprocess.Popen([data["om_points"], ">", diz['d']+"/points.xml"])
-# print "Happens while running"
-# p.communicate() #now wait plus that you can send commands to process
+get_VM_config_files('s1')
