@@ -2,6 +2,7 @@
 
 import os
 import sys
+import subprocess
 from subprocess import call
 import argparse
 from lxml import etree
@@ -19,6 +20,7 @@ from os.path import isfile, join
 #  qemu images support  --> sudo apt-get install qemu
 
 # Constat definitions
+FILES_TO_PRESERVE = ["script1.py", ".gitignore", "tests.py", "cp1.cfg", "dudas.txt", "README.md", "test2.py"]
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
@@ -127,11 +129,16 @@ def virsh_start(vm_name):
     call(["sudo", "virsh", "start", vm_name])
     print(vm_name + "started!")
 
-def virsh_undefine(vm_name):
-    call(["sudo", "virsh", "undefine", vm_name])
+def virsh_undefine_all():
+    ps = subprocess.Popen(["sudo", "virsh", "list", "--inactive", "--name"], stdout=subprocess.PIPE)
+    output = subprocess.check_output(["xargs", "-r", "-n", "1", "virsh","undefine"], stdin=ps.stdout)
+    ps.wait()
 
 def virsh_shutdown(vm_name):
     call(["sudo", "virsh", "shutdown", vm_name])
+
+def virsh_list_inactive_domains():
+    call(["sudo", "virsh", "list", "--i"])
 
 def open_VM_console(vm_name):
     call(["virt-viewer", vm_name])
@@ -159,8 +166,7 @@ def get_files_to_delete(my_path):
     # Get a list containing all file names in the directory
     to_return = [f for f in listdir(my_path) if isfile(join(my_path, f))]
     
-    files_to_preserve = ["script1.py", ".gitignore", "tests.py", "cp1.cfg", "dudas.txt", "README.md"]
-    for file_name in files_to_preserve:
+    for file_name in FILES_TO_PRESERVE:
         to_return.remove(file_name)
 
     # Get all .qcow images file names except the source, IMAGE_NAME
@@ -215,12 +221,7 @@ def get_VM_config_files(vm_name):
         hostname_file = open(TMP_DIR_PATH + '/' + 'hostname', 'w')
         hostname_file.write(vm_name)
         hostname_file.close()
-        # /etc/network/interfaces file creation
-        interfaces_file = open(TMP_DIR_PATH + '/network/interfaces', 'w')
-        # here the file was to bee written
-        hostname_file.close()
-
-        config
+        
     except OSError:
         print("Fail while creating the temporal VM config files")
     else:
@@ -248,6 +249,9 @@ def stop():
 def release():
     # Stops the environment before deleting the files
     stop()
+
+    #undefine the domains
+    virsh_undefine_all()
     
     # Deletes the environment files creted by the option create
     files_to_delete = get_files_to_delete(CURRENT_PATH)

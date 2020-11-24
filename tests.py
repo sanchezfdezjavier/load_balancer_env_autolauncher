@@ -26,12 +26,17 @@ LAN1 = {
     "netmask": "255.255.255.0",
     "gateway": "10.0.1.1"
 }
+CLIENT_IP = ""
+
+
 BASE_ADRESS_LAN2 = "10.0.2.11"
 LAN2 = {
   "network": "10.0.2.0",
   "netmask": "255.255.255.0",
   "gateway": "10.0.2.1"
 }
+
+SERVER_IPs = ["10.0.2.11", "10.0.2.12", "10.0.2.13", "10.0.2.14", "10.0.2.15"]
 
 #print("The current directory is:\n" + current_path)
 
@@ -49,21 +54,36 @@ def get_VM_config_files(vm_name):
         hostname_file.close()
         # copy hostname file into the VM /etc/hostname path
         call(["sudo", "virt-copy-in", "-a", vm_name + ".qcow2", TMP_DIR_PATH + "/hostname", "/etc"])
-
         #/etc/network/interfaces config file creation
-        interfaces_file = open(TMP_DIR_PATH + '/network/interfaces', 'w')
-        # interfaces_file writelines
+        interfaces_file = open(TMP_DIR_PATH + '/interfaces', 'w')
+
+        # write interfaces file
+        LINES_TO_WRITE = ["# auto lo\n"
+                        , "# iface lo inet loopback\n"
+                        , "# iface eth0 inet static\n"
+                        , "#     address " + SERVER_IPs.pop(0) + "\n"
+                        , "#     network " + LAN2['network']  + "\n"
+                        , "#     netmask " + LAN2['netmask']  + "\n"
+                        , "#     gateway " + LAN2['gateway']  + "\n"]
+
+        interfaces_file.writelines(LINES_TO_WRITE)
         interfaces_file.close()
         # copy interfaces file into the VM /etc/network/inteface path
         call(["sudo", "virt-copy-in", "-a", vm_name + ".qcow2", TMP_DIR_PATH + "/interfaces", "/etc/network"])
+
+        print(vm_name + " /etc/hostname config file:")
+        call(["sudo", "virt-cat", "-a", vm_name + ".qcow2", "/etc/hostname"])
+        print("\n" + vm_name + " /etc/network/interfaces config file: ")
+        call(["sudo", "virt-cat", "-a", vm_name + ".qcow2","/etc/network/interfaces"])
+        print("")
+        
+        shutil.rmtree(TMP_DIR_PATH)
+
     except OSError:
         print("Fail while creating the temporal VM config files")
     else:
-        print("Files successfully created")
-
-    call(["sudo", "virt-copy-in", "-a", "s1.qcow", "hostname", "/etc/"])
-
-    #sudo virt-copy-in -a s1.qcow2 interfaces /etc/network
+        print("Server hostname and interfaces successfullly configured")
 
 get_VM_config_files('s1')
+get_VM_config_files('s2')
 
