@@ -29,8 +29,24 @@ BRIDGE = "virbr0"
 IMAGE_SOURCE_PATH = "/home/javier/Desktop/load_balancer_env_autolauncher/" + IMAGE_NAME
 CLIENT_NAME = "c1"
 LOAD_BALANCER_NAME = "lb"
+
 LAN1_NAME = "LAN1"
+BASE_ADRESS_LAN1 = "10.0.1.2"
+LAN1 = {
+    "network": "10.0.1.0",
+    "netmask": "255.255.255.0",
+    "gateway": "10.0.1.1"
+}
+
 LAN2_NAME = "LAN2"
+BASE_ADRESS_LAN2 = "10.0.2.11"
+LAN2 = {
+  "network": "10.0.2.0",
+  "netmask": "255.255.255.0",
+  "gateway": "10.0.2.1"
+}
+
+
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -195,9 +211,16 @@ def get_VM_config_files(vm_name):
     try:
         print(TMP_DIR_PATH + '/' + 'hostname')
         os.mkdir(TMP_DIR_PATH)
-        config_file = open(TMP_DIR_PATH + '/' + 'hostname', 'w')
-        config_file.write(vm_name)
-        config_file.close()
+        # /etc/hostname file creation
+        hostname_file = open(TMP_DIR_PATH + '/' + 'hostname', 'w')
+        hostname_file.write(vm_name)
+        hostname_file.close()
+        # /etc/network/interfaces file creation
+        interfaces_file = open(TMP_DIR_PATH + '/network/interfaces', 'w')
+        # here the file was to bee written
+        hostname_file.close()
+
+        config
     except OSError:
         print("Fail while creating the temporal VM config files")
     else:
