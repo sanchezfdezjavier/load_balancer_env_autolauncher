@@ -132,7 +132,7 @@ def virsh_define(xml_file):
 
 def virsh_start(vm_name):
     call(["sudo", "virsh", "start", vm_name])
-    print(vm_name + "started!")
+    print(vm_name + " started!")
 
 def virsh_undefine_all():
     ps = subprocess.Popen(["sudo", "virsh", "list", "--inactive", "--name"], stdout=subprocess.PIPE)
@@ -142,8 +142,11 @@ def virsh_undefine_all():
 def virsh_shutdown(vm_name):
     call(["sudo", "virsh", "shutdown", vm_name])
 
-def virsh_list_inactive_domains():
-    call(["sudo", "virsh", "list", "--i"])
+def virsh_list(inactive=False):
+    if inactive:
+        call(["sudo", "virsh", "list", "--inactive"])
+    else:
+        call(["sudo", "virsh", "list"])
 
 def open_VM_console(vm_name):
     call(["virt-viewer", vm_name])
@@ -249,7 +252,13 @@ def config_VM_hostname_interfaces(vm_name, vm_type):
     else:
         print("Server hostname and interfaces successfullly configured")
 
-#DONE: !WARNING interfaces MUST BE CHANGED
+def get_server_names_from_config_file():
+    f = open('cp1.cfg', 'r')
+    NUM_SERV = int(f.readline()[-1])
+    server_names = [("s" + str(i)) for i in range(1,NUM_SERV +1)]
+    return server_names
+
+# DONE: !WARNING interfaces MUST BE CHANGED
 def create():
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow and c1.qcow2 and lb.qcow2
     qemu_create_cow(NSERVERS)
@@ -286,17 +295,38 @@ def create():
     config_VM_hostname_interfaces(LOAD_BALANCER_NAME, 'load_balancer')
 
     print("Create successfully")
+    virsh_list()
 
 def start():
-    print(server_names)
-    for server in server_names:
+    SERVER_NAMES = get_server_names_from_config_file()
+    print(SERVER_NAMES)
+
+    # Server start
+    for server in SERVER_NAMES:
         virsh_start(server)
 
-def stop():
-    VMs_running = server_names
+    # Client start
+    virsh_start(CLIENT_NAME)
+    # Load balancer start
+    virsh_start(LOAD_BALANCER_NAME)
 
-    for vm in VMs_running:
-        virsh_shutdown(vm)
+    virsh_list()
+
+def stop():
+    SERVER_NAMES = get_server_names_from_config_file()
+
+    # Stop servers
+    for server in SERVER_NAMES:
+        virsh_shutdown(server)
+    
+    # Stop client
+    virsh_shutdown(CLIENT_NAME)
+
+    # Stop load balancer
+    virsh_shutdown(LOAD_BALANCER_NAME)
+    print("Stop finished")
+
+    virsh_list(True)
 
 def release():
     # Stops the environment before deleting the files
@@ -311,6 +341,9 @@ def release():
         call(["rm", file_name])
     print("Files successfully deleted")
 
+    virsh_list()
+    virsh_list(True)
+
 if __name__ == '__main__':
     ARGS = parse_Arguments().__dict__
     ORDER = check_order_input_value(ARGS['order'])
@@ -321,9 +354,10 @@ if __name__ == '__main__':
     #optional_without_create()
 
     # Save data in config file
-    config_file = open("cp1.cfg", 'w')
-    config_file.write("num_serv=" + str(NSERVERS))
-    config_file.close()
+    if ORDER == 'create':
+        config_file = open("cp1.cfg", 'w')
+        config_file.write("num_serv=" + str(NSERVERS))
+        config_file.close()
 
     # Reading the config file
     config = open("cp1.cfg", "r")
