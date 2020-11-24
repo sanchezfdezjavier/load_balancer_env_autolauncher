@@ -14,3 +14,4 @@ no se si puede tener que ver con los permisos que tenga el archivo, pero hay que
 5. Porque las modificaciones en las maquinas virtuales aparentenemente se hacen correctamente(lo podemos comprobar haciendo
 virt-cat), pero luego al entrar nosotros en los ficheros en cuestion por la consola de la maquina, no se ven las modificaciones??
 6.BORRAR archivos de testing de la constante para que se borren automaticamente
+7.Comprobar la configuración de red, los ficheros se escriben correctamente, pero no se si el contenido esta bien

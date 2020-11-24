@@ -32,6 +32,9 @@ IMAGE_SOURCE_PATH = "/home/javier/Desktop/load_balancer_env_autolauncher/" + IMA
 CLIENT_NAME = "c1"
 LOAD_BALANCER_NAME = "lb"
 
+SERVER_IPs = ["10.0.2.11", "10.0.2.12", "10.0.2.13", "10.0.2.14", "10.0.2.15"]
+CLIENT_IP = "10.0.1.2"
+
 LAN1_NAME = "LAN1"
 BASE_ADRESS_LAN1 = "10.0.1.2"
 LAN1 = {
@@ -47,8 +50,6 @@ LAN2 = {
   "netmask": "255.255.255.0",
   "gateway": "10.0.2.1"
 }
-
-
 
 def parse_Arguments():
     parser = argparse.ArgumentParser()
@@ -181,6 +182,69 @@ def get_files_to_delete(my_path):
 
     return to_return
 
+def config_VM_hostname_interfaces(vm_name, vm_type):
+    vm_types = ['server', 'client', 'load_balancer']
+    current_path = os.getcwd()
+    TMP_DIR_NAME = "tmp_config_files"
+    TMP_DIR_PATH= current_path + '/' + TMP_DIR_NAME
+    LINES_TO_WRITE = []
+
+    if (not (vm_type in vm_types)):
+        print("The elegible VM types are: server/client/load_balancer")
+        return
+
+    try:
+        os.mkdir(TMP_DIR_PATH)
+
+        # /etc/hostname config file creation
+        hostname_file = open(TMP_DIR_PATH + '/hostname', 'w')
+        hostname_file.write(vm_name)
+        hostname_file.close()
+        # copy hostname file into the VM /etc/hostname path
+        call(["sudo", "virt-copy-in", "-a", vm_name + ".qcow2", TMP_DIR_PATH + "/hostname", "/etc"])
+
+
+        #/etc/network/interfaces config file creation
+        interfaces_file = open(TMP_DIR_PATH + '/interfaces', 'w')
+        # write interfaces file
+        if(vm_type == 'server'):
+            LINES_TO_WRITE = ["# auto lo\n"
+                            , "# iface lo inet loopback\n"
+                            , "# iface eth0 inet static\n"
+                            , "#     address " + SERVER_IPs.pop(0) + "\n"
+                            , "#     network " + LAN2['network']  +  "\n"
+                            , "#     netmask " + LAN2['netmask']  +  "\n"
+                            , "#     gateway " + LAN2['gateway']  +  "\n"]
+        elif(vm_type == 'client'):
+            LINES_TO_WRITE = ["# auto lo\n"
+                            , "# iface lo inet loopback\n"
+                            , "# iface eth0 inet static\n"
+                            , "#     address " + CLIENT_IP + "\n"
+                            , "#     network " + LAN1['network']  +  "\n"
+                            , "#     netmask " + LAN1['netmask']  +  "\n"
+                            , "#     gateway " + LAN1['gateway']  +  "\n"]
+        elif(vm_type == 'load_balancer'):
+            LINES_TO_WRITE = "ESTO HAY QUE VER COMO ES LA CONFIGURACION"
+
+        interfaces_file.writelines(LINES_TO_WRITE)
+        interfaces_file.close()
+        # copy interfaces file into the VM /etc/network/inteface path
+        call(["sudo", "virt-copy-in", "-a", vm_name + ".qcow2", TMP_DIR_PATH + "/interfaces", "/etc/network"])
+
+        # Print the config files inside the VMs
+        print(vm_name + " /etc/hostname config file:")
+        call(["sudo", "virt-cat", "-a", vm_name + ".qcow2", "/etc/hostname"])
+        print("\n" + vm_name + " /etc/network/interfaces config file: ")
+        call(["sudo", "virt-cat", "-a", vm_name + ".qcow2","/etc/network/interfaces"])
+        print("")
+        
+        shutil.rmtree(TMP_DIR_PATH)
+
+    except OSError:
+        print("Fail while creating the temporal VM config files")
+    else:
+        print("Server hostname and interfaces successfullly configured")
+
 def create():
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow and c1.qcow2 and lb.qcow2
     qemu_create_cow(NSERVERS)
@@ -204,34 +268,19 @@ def create():
     # virsh define for load balancer
     virsh_define(LOAD_BALANCER_NAME + ".xml")
 
-    # Bridges creation and config for both viratual networks
+    # Bridges creation and config for both virtual networks
     bridges_config()
 
+    # Hostname and interfaces config for each VM
+    # Servers config
+    for server in server_names:
+        config_VM_hostname_interfaces(server, 'server')
+    # Client config
+    config_VM_hostname_interfaces(CLIENT_NAME, 'client')
+    # Load balancer config
+    config_VM_hostname_interfaces(LOAD_BALANCER_NAME, 'load_balancer')
+
     print("Create successfully")
-
-def get_VM_config_files(vm_name):
-    current_path = os.getcwd()
-    TMP_DIR_NAME = "tmp_config_files"
-    TMP_DIR_PATH= current_path + '/' + TMP_DIR_NAME
-
-    try:
-        print(TMP_DIR_PATH + '/' + 'hostname')
-        os.mkdir(TMP_DIR_PATH)
-        # /etc/hostname file creation
-        hostname_file = open(TMP_DIR_PATH + '/' + 'hostname', 'w')
-        hostname_file.write(vm_name)
-        hostname_file.close()
-        
-    except OSError:
-        print("Fail while creating the temporal VM config files")
-    else:
-        print("Files successfully created")
-
-    
-
-    # Delete all temporal files
-    #shutil.rmtree(current_path + '/' + TMP_DIR_NAME)
-    #print("Files successfully deleted")
 
 def start():
     print(server_names)
@@ -243,8 +292,6 @@ def stop():
 
     for vm in VMs_running:
         virsh_shutdown(vm)
-
-
 
 def release():
     # Stops the environment before deleting the files
@@ -259,8 +306,6 @@ def release():
         call(["rm", file_name])
     
     print("Files successfully deleted")
-
-
 
 if __name__ == '__main__':
     ARGS = parse_Arguments().__dict__
