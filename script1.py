@@ -8,7 +8,6 @@ import argparse
 from lxml import etree
 import logging
 import sys
-
 import shutil
 
 from os import listdir
@@ -26,9 +25,9 @@ ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
 MAX_SERVERS = 5
 XML_TEMPLATE = "plantilla-vm-p3.xml"
-IMAGE_NAME = "cdps-vm-base-p3.qcow2"
+BASE_IMAGE_NAME = "cdps-vm-base-p3.qcow2"
 BRIDGE = "virbr0"
-IMAGE_SOURCE_PATH = "/home/javier/Desktop/load_balancer_env_autolauncher/" + IMAGE_NAME
+IMAGE_SOURCE_PATH = CURRENT_PATH + "/" + BASE_IMAGE_NAME
 CLIENT_NAME = "c1"
 LOAD_BALANCER_NAME = "lb"
 
@@ -82,11 +81,16 @@ def qemu_create_cow(nservers):
      for i in range(1, nservers + 1):
         sx_image_name = "s%i.qcow2" % i
      	call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", sx_image_name])
+        call(["chmod", "+w", sx_image_name])
         # Saves the created servers names in server_names in main thread
         server_names.append("s%i" % i)
 
-     call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "lb.qcow2"])
-     call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", "c1.qcow2"])
+
+
+     call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", LOAD_BALANCER_NAME + ".qcow2"])
+     call(["chmod", "+w", LOAD_BALANCER_NAME + ".qcow2"])
+     call(["qemu-img", "create", "-f", "qcow2", "-b", "cdps-vm-base-p3.qcow2", CLIENT_NAME + ".qcow2"])
+     call(["chmod", "+w", CLIENT_NAME + ".qcow2"])
 
      print("cow images successfully created")
 
@@ -100,15 +104,15 @@ def create_xml_templates(xml_template, nservers=1):
     # Create XML lb load balancer template
     call(["cp", XML_TEMPLATE, LOAD_BALANCER_NAME + ".xml"])
 
-def setup_xml(xml_file):
+def setup_xml(vm_name):
     # Load xml file
-    file = etree.parse(xml_file)
+    file = etree.parse(vm_name + ".xml")
     # Finds the root tag
     root = file.getroot()
 
     # Change VM name tag: takes the xml_file name without the extension
     name_tag = root.find("name")
-    name_tag.text = xml_file.split('.')[0]
+    name_tag.text = vm_name
 
     # Change brige type of source tag to 'virbr0'
     bridge_source_tag = root.find("./devices/interface/source")
@@ -116,10 +120,10 @@ def setup_xml(xml_file):
 
     # Change qcow2 image source file with IMAGE_SOURCE_PATH
     image_source_tag = root.find('./devices/disk/source')
-    image_source_tag.set("file", IMAGE_SOURCE_PATH)
+    image_source_tag.set("file", CURRENT_PATH + "/" + vm_name + ".qcow2")
     
     # Save the changes
-    file_saved = open(xml_file, 'w')
+    file_saved = open(vm_name + ".xml", 'w')
     file_saved.write(etree.tostring(root, pretty_print=True))
     file_saved.close()
 
@@ -172,7 +176,7 @@ def get_files_to_delete(my_path):
 
     # Get all .qcow images file names except the source, IMAGE_NAME
     for file_name in to_return:
-        if (file_name.endswith(".qcow2") and (file_name == IMAGE_NAME)):
+        if (file_name.endswith(".qcow2") and (file_name == BASE_IMAGE_NAME)):
             to_return.remove(file_name)
 
     # Get all .xml config files, except the template, XML_TEMPLATE
@@ -245,6 +249,7 @@ def config_VM_hostname_interfaces(vm_name, vm_type):
     else:
         print("Server hostname and interfaces successfullly configured")
 
+#DONE: !WARNING interfaces MUST BE CHANGED
 def create():
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow and c1.qcow2 and lb.qcow2
     qemu_create_cow(NSERVERS)
@@ -253,11 +258,11 @@ def create():
 
     # XML setup for each server
     for s in server_names:
-        setup_xml("%s.xml" % s)
+        setup_xml(s)
     # XML setup for the client
-    setup_xml(CLIENT_NAME + ".xml")
+    setup_xml(CLIENT_NAME)
     # XML setup for load balancer
-    setup_xml(LOAD_BALANCER_NAME + ".xml")
+    setup_xml(LOAD_BALANCER_NAME)
 
     # virsh define for all servers
     for server in server_names:
@@ -304,7 +309,6 @@ def release():
     files_to_delete = get_files_to_delete(CURRENT_PATH)
     for file_name in files_to_delete:
         call(["rm", file_name])
-    
     print("Files successfully deleted")
 
 if __name__ == '__main__':
