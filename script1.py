@@ -148,8 +148,13 @@ def virsh_list(inactive=False):
     else:
         call(["sudo", "virsh", "list"])
 
+# def virsh_lb_forwarding_setup();
+#     # sudo virt-edit -a lb.qcow2 /etc/sysctl.conf \  -e 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' 
+#     # call(["sudo", "virt-edit", "-a", LOAD_BALANCER_NAME + ".qcow2", "/etc/sysctl.conf", "\", "-e"])
+#     pass
+
 def open_VM_console(vm_name):
-    call(["virt-viewer", vm_name])
+    ps = subprocess.Popen(["virt-viewer", vm_name])
 
 def brctl_addbr(lan_name):
     # sudo brctl addbr <lan name>
@@ -337,7 +342,16 @@ def start():
     # Load balancer start
     virsh_start(LOAD_BALANCER_NAME)
 
+    # open server consoles
+    for server in SERVER_NAMES:
+        open_VM_console(server)
+    # open load balancer console
+    open_VM_console(LOAD_BALANCER_NAME)
+    # open client console
+    open_VM_console(CLIENT_NAME)    
+
     virsh_list()
+
 
 def stop():
     SERVER_NAMES = get_server_names_from_config_file()
