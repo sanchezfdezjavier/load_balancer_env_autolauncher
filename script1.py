@@ -253,6 +253,24 @@ def config_VM_hostname_interfaces(vm_name, vm_type):
     else:
         print("Server hostname and interfaces successfullly configured")
 
+def edit_HTML_server_name(vm_name):
+    TMP_DIR_NAME = "tmp_config_html"
+    current_path = os.getcwd()
+    TMP_DIR_PATH= current_path + '/' + TMP_DIR_NAME
+    os.mkdir(TMP_DIR_PATH)
+
+    # /var/www/html/index.html file creation
+    indexHTML_file = open(TMP_DIR_PATH + '/index.html', 'w')
+    indexHTML_file.write(vm_name)
+    indexHTML_file.close()
+    # /var/www/html/index.html"
+    # TMP_DIR_PATH + "/hostname", "/etc" 
+    call(["sudo", "virt-copy-in", "-a", vm_name + ".qcow2", TMP_DIR_PATH + "/index.html", "/var/www/html/"])
+
+    # delete all temporary files
+    shutil.rmtree(TMP_DIR_PATH)
+    print(vm_name + " index.html successfully configured!")
+
 def get_server_names_from_config_file():
     f = open('cp1.cfg', 'r')
     NUM_SERV = int(f.readline()[-1])
@@ -267,12 +285,20 @@ def create():
     create_xml_templates(XML_TEMPLATE, NSERVERS)
 
     # XML setup for each server
-    for s in server_names:
-        setup_xml(s)
+    for server in server_names:
+        setup_xml(server)
     # XML setup for the client
     setup_xml(CLIENT_NAME)
     # XML setup for load balancer
     setup_xml(LOAD_BALANCER_NAME)
+
+    # HTML server setup
+    for server in server_names:
+        edit_HTML_server_name(server)
+    # HTML client setup
+    edit_HTML_server_name(CLIENT_NAME)
+    # HTML load balancer setup
+    edit_HTML_server_name(LOAD_BALANCER_NAME)
 
     # virsh define for all servers
     for server in server_names:
