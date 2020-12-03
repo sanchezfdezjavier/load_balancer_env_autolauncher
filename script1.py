@@ -175,7 +175,8 @@ def get_files_to_delete(my_path):
     to_return = [f for f in listdir(my_path) if isfile(join(my_path, f))]
     
     for file_name in FILES_TO_PRESERVE:
-        to_return.remove(file_name)
+        if(file_name in to_return):
+            to_return.remove(file_name)
 
     # Get all .qcow images file names except the source, IMAGE_NAME
     for file_name in to_return:
@@ -295,7 +296,7 @@ def create():
     config_VM_hostname_interfaces(LOAD_BALANCER_NAME, 'load_balancer')
 
     print("Create successfully")
-    virsh_list()
+    virsh_list(inactive=True)
 
 def start():
     SERVER_NAMES = get_server_names_from_config_file()
@@ -326,7 +327,7 @@ def stop():
     virsh_shutdown(LOAD_BALANCER_NAME)
     print("Stop finished")
 
-    virsh_list(True)
+    virsh_list(inactive=True)
 
 def release():
     # Stops the environment before deleting the files
@@ -375,7 +376,5 @@ if __name__ == '__main__':
     # Call the suitable function depending on user ORDER input {create/start/stop/release}
     command_function = ORDER
     getattr(sys.modules[__name__], "%s" % command_function)()
-
-    print(server_names)
 
     print("End")
