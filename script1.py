@@ -19,7 +19,7 @@ from os.path import isfile, join
 #  qemu images support  --> sudo apt-get install qemu
 
 # Constat definitions
-FILES_TO_PRESERVE = ["script1.py", ".gitignore", "tests.py", "cp1.cfg", "dudas.txt", "README.md", "test2.py"]
+FILES_TO_PRESERVE = ["script1.py", ".gitignore", "tests.py", "dudas.txt", "README.md", "test2.py"]
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
@@ -37,9 +37,10 @@ CLIENT_IP = "10.0.1.2"
 LAN1_NAME = "LAN1"
 BASE_ADRESS_LAN1 = "10.0.1.2"
 LAN1 = {
-    "network": "10.0.1.0",
-    "netmask": "255.255.255.0",
-    "gateway": "10.0.1.1"
+    "network":  "10.0.1.0",
+    "netmask":  "255.255.255.0",
+    "gateway":  "10.0.1.1",
+    "broadcast": "10.0.1.255"
 }
 
 LAN2_NAME = "LAN2"
@@ -47,7 +48,8 @@ BASE_ADRESS_LAN2 = "10.0.2.11"
 LAN2 = {
   "network": "10.0.2.0",
   "netmask": "255.255.255.0",
-  "gateway": "10.0.2.1"
+  "gateway": "10.0.2.1",
+  "broadcast": "10.0.2.255"
 }
 
 def parse_Arguments():
@@ -148,15 +150,25 @@ def virsh_list(inactive=False):
     else:
         call(["sudo", "virsh", "list"])
 
-# def virsh_lb_forwarding_setup();
-#     # sudo virt-edit -a lb.qcow2 /etc/sysctl.conf \  -e 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' 
-#     # call(["sudo", "virt-edit", "-a", LOAD_BALANCER_NAME + ".qcow2", "/etc/sysctl.conf", "\", "-e"])
-#     pass
+def virsh_lb_forwarding_setup():
+    current_path = os.getcwd()
+    TMP_DIR_NAME = "forwarding_tmp"
+    TMP_DIR_PATH = current_path + '/' + TMP_DIR_NAME
+
+    os.mkdir(TMP_DIR_PATH)
+
+    # /etc/hostname config file creation
+    forwarding_file = open(TMP_DIR_PATH + '/sysctl.conf', 'w')
+    forwarding_file.write("net.ipv4.ip_forward=1")
+    forwarding_file.close()
+    # copy hostname file into the VM /etc/hostname path
+    call(["sudo", "virt-copy-in", "-a", LOAD_BALANCER_NAME + ".qcow2", TMP_DIR_PATH + "/sysctl.conf", "/etc"])
+    shutil.rmtree(TMP_DIR_PATH)
 
 def open_VM_console(vm_name):
     ps = subprocess.Popen(["virt-viewer", vm_name])
 
-def brctl_addbr(lan_name):
+def brctl_addbr(lan_name):  
     # sudo brctl addbr <lan name>
     call(["sudo", "brctl", "addbr", lan_name])
     
@@ -221,23 +233,36 @@ def config_VM_hostname_interfaces(vm_name, vm_type):
         interfaces_file = open(TMP_DIR_PATH + '/interfaces', 'w')
         # write interfaces file
         if(vm_type == 'server'):
-            LINES_TO_WRITE = ["# auto lo\n"
-                            , "# iface lo inet loopback\n"
-                            , "# iface eth0 inet static\n"
-                            , "#     address " + SERVER_IPs.pop(0) + "\n"
-                            , "#     network " + LAN2['network']  +  "\n"
-                            , "#     netmask " + LAN2['netmask']  +  "\n"
-                            , "#     gateway " + LAN2['gateway']  +  "\n"]
+            LINES_TO_WRITE = ["auto lo\n"
+                            , "iface lo inet loopback\n"
+                            , "iface eth0 inet static\n"
+                            , "    address " + SERVER_IPs.pop(0) + "\n"
+                            , "    network " + LAN2['network']  +  "\n"
+                            , "    netmask " + LAN2['netmask']  +  "\n"
+                            , "    gateway " + LAN2['gateway']  +  "\n"
+                            , "    broadcast"+ LAN2['broadcast']+  "\n"]
+
         elif(vm_type == 'client'):
-            LINES_TO_WRITE = ["# auto lo\n"
-                            , "# iface lo inet loopback\n"
-                            , "# iface eth0 inet static\n"
-                            , "#     address " + CLIENT_IP + "\n"
-                            , "#     network " + LAN1['network']  +  "\n"
-                            , "#     netmask " + LAN1['netmask']  +  "\n"
-                            , "#     gateway " + LAN1['gateway']  +  "\n"]
+            LINES_TO_WRITE = ["auto lo\n"
+                            , "iface lo inet loopback\n"
+                            , "iface eth0 inet static\n"
+                            , "    address "  + CLIENT_IP + "\n"
+                            , "    network "  + LAN1['network']  +  "\n"
+                            , "    netmask "  + LAN1['netmask']  +  "\n"
+                            , "    gateway "  + LAN1['gateway']  +  "\n"
+                            , "    broadcast "+ LAN1['broadcast']+  "\n"]
         elif(vm_type == 'load_balancer'):
-            LINES_TO_WRITE = "ESTO HAY QUE VER COMO ES LA CONFIGURACION"
+            LINES_TO_WRITE = ["auto lo\n"
+                            , "iface eth0 inet static\n"
+                            , "    address "  + LAN1['gateway']  + "\n"
+                            , "    network "  + LAN1['network']  + "\n"
+                            , "    netmask "  + LAN1['netmask']  + "\n"
+                            , "    broadcast "+ LAN1['broadcast']+ "\n\n"
+                            , "iface eth1 inet static\n"
+                            , "    address "  + LAN2['gateway']  + "\n"
+                            , "    network "  + LAN2['network']  + "\n"
+                            , "    netmask "  + LAN2['netmask']  + "\n"
+                            , "    broadcast "+ LAN2['broadcast']+ "\n"]
 
         interfaces_file.writelines(LINES_TO_WRITE)
         interfaces_file.close()
@@ -326,6 +351,9 @@ def create():
     # Load balancer config
     config_VM_hostname_interfaces(LOAD_BALANCER_NAME, 'load_balancer')
 
+    # Enable ip forwarding for load balancer
+    virsh_lb_forwarding_setup()
+
     print("Create successfully")
     virsh_list(inactive=True)
 
@@ -351,7 +379,6 @@ def start():
     open_VM_console(CLIENT_NAME)    
 
     virsh_list()
-
 
 def stop():
     SERVER_NAMES = get_server_names_from_config_file()
