@@ -6,12 +6,12 @@ import subprocess
 from subprocess import call
 import argparse
 from lxml import etree
-import logging
 import sys
 import shutil
 
 from os import listdir
 from os.path import isfile, join
+from time import sleep
 
 # WARNING !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111
 # This code does not work if you don't have installed the following dependecies:
@@ -19,7 +19,7 @@ from os.path import isfile, join
 #  qemu images support  --> sudo apt-get install qemu
 
 # Constat definitions
-FILES_TO_PRESERVE = ["script1.py", ".gitignore", "tests.py", "dudas.txt", "README.md", "test2.py"]
+FILES_TO_PRESERVE = ["pc1.py","script1.py", "cp1.cfg",".gitignore", "tests.py", "dudas.txt", "README.md", "test2.py"]
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 ORDER_MODES = ["create", "start", "stop", "release"]
 MIN_SERVERS = 1
@@ -106,7 +106,13 @@ def create_xml_templates(xml_template, nservers=1):
     # Create XML lb load balancer template
     call(["cp", XML_TEMPLATE, LOAD_BALANCER_NAME + ".xml"])
 
-def setup_xml(vm_name):
+def setup_xml(vm_name, lan,load_balancer=False):
+    BRIDGE = ""
+    if (lan == 1):
+        BRIDGE = "LAN1"
+    elif(lan == 2):
+        BRIDGE = "LAN2"
+
     # Load xml file
     file = etree.parse(vm_name + ".xml")
     # Finds the root tag
@@ -119,6 +125,18 @@ def setup_xml(vm_name):
     # Change brige type of source tag to 'virbr0'
     bridge_source_tag = root.find("./devices/interface/source")
     bridge_source_tag.set("bridge", BRIDGE)
+
+    if(load_balancer):
+        devices = root.find("devices")
+        inter = etree.Element("interface")
+        inter.set("type", 'bridge')
+        var = etree.Element("source")
+        var.set("bridge", 'LAN2')
+        model = etree.Element("model")
+        model.set("type", 'virtio')
+        inter.append(var)
+        inter.append(model)
+        devices.append(inter)
 
     # Change qcow2 image source file with IMAGE_SOURCE_PATH
     image_source_tag = root.find('./devices/disk/source')
@@ -235,34 +253,35 @@ def config_VM_hostname_interfaces(vm_name, vm_type):
         if(vm_type == 'server'):
             LINES_TO_WRITE = ["auto lo\n"
                             , "iface lo inet loopback\n"
+                            , "auto eth0\n"
                             , "iface eth0 inet static\n"
                             , "    address " + SERVER_IPs.pop(0) + "\n"
                             , "    network " + LAN2['network']  +  "\n"
                             , "    netmask " + LAN2['netmask']  +  "\n"
-                            , "    gateway " + LAN2['gateway']  +  "\n"
-                            , "    broadcast"+ LAN2['broadcast']+  "\n"]
+                            , "    gateway " + LAN2['gateway']  +  "\n"]
 
         elif(vm_type == 'client'):
             LINES_TO_WRITE = ["auto lo\n"
                             , "iface lo inet loopback\n"
+                            , "auto eth0\n"
                             , "iface eth0 inet static\n"
                             , "    address "  + CLIENT_IP + "\n"
                             , "    network "  + LAN1['network']  +  "\n"
                             , "    netmask "  + LAN1['netmask']  +  "\n"
-                            , "    gateway "  + LAN1['gateway']  +  "\n"
-                            , "    broadcast "+ LAN1['broadcast']+  "\n"]
+                            , "    gateway "  + LAN1['gateway']  +  "\n"]
         elif(vm_type == 'load_balancer'):
             LINES_TO_WRITE = ["auto lo\n"
+                            , "iface lo inet loopback\n"
+                            , "auto eth0\n"
                             , "iface eth0 inet static\n"
                             , "    address "  + LAN1['gateway']  + "\n"
                             , "    network "  + LAN1['network']  + "\n"
                             , "    netmask "  + LAN1['netmask']  + "\n"
                             , "    broadcast "+ LAN1['broadcast']+ "\n\n"
+                            , "auto eth1\n"
                             , "iface eth1 inet static\n"
                             , "    address "  + LAN2['gateway']  + "\n"
-                            , "    network "  + LAN2['network']  + "\n"
-                            , "    netmask "  + LAN2['netmask']  + "\n"
-                            , "    broadcast "+ LAN2['broadcast']+ "\n"]
+                            , "    netmask "  + LAN2['netmask']  + "\n"]
 
         interfaces_file.writelines(LINES_TO_WRITE)
         interfaces_file.close()
@@ -307,7 +326,32 @@ def get_server_names_from_config_file():
     server_names = [("s" + str(i)) for i in range(1,NUM_SERV +1)]
     return server_names
 
-# DONE: !WARNING interfaces MUST BE CHANGED
+def config_hosts(vm_name):
+    #sudo virt-copy-out -a s1.qcow2 /etc/network/interfaces .
+    current_path = os.getcwd()
+    TMP_DIR_NAME = "tmp_host"
+    TMP_DIR_PATH= current_path + '/' + TMP_DIR_NAME
+    os.mkdir(TMP_DIR_PATH)
+
+    # /etc/hostname config file creation
+    # hosts file edit
+    # hosts file edit
+    hosts = open(TMP_DIR_NAME + "/hosts", "w")
+    hosts.write("127.0.1.1 {}\n".format(vm_name))
+    hosts.write("127.0.0.1 localhost\n")
+    hosts.write("::1 ip6-localhost ip6-loopback\n")
+    hosts.write("fe00::0 ip6-localnet\n")
+    hosts.write("ff00::0 ip6-mcastprefix\n")
+    hosts.write("ff02::1 ip6-allnodes\n")
+    hosts.write("ff02::2 ip6-allrouters\n")
+    hosts.write("ff02::3 ip6-allhosts\n")
+    hosts.close()
+
+    # copy hostname file into the VM /etc/hostname path
+    call(["sudo", "virt-copy-in", "-a", "{}.qcow2".format(vm_name), "{}/hosts".format(TMP_DIR_PATH), "/etc"])
+    shutil.rmtree(TMP_DIR_PATH)
+
+
 def create():
     # Create qemu servers images s1.qcow, s2.qcow,..., sn.qcow and c1.qcow2 and lb.qcow2
     qemu_create_cow(NSERVERS)
@@ -316,19 +360,15 @@ def create():
 
     # XML setup for each server
     for server in server_names:
-        setup_xml(server)
+        setup_xml(server,2)
     # XML setup for the client
-    setup_xml(CLIENT_NAME)
+    setup_xml(CLIENT_NAME,1)
     # XML setup for load balancer
-    setup_xml(LOAD_BALANCER_NAME)
+    setup_xml(LOAD_BALANCER_NAME, 1,load_balancer=True)
 
     # HTML server setup
     for server in server_names:
         edit_HTML_server_name(server)
-    # HTML client setup
-    edit_HTML_server_name(CLIENT_NAME)
-    # HTML load balancer setup
-    edit_HTML_server_name(LOAD_BALANCER_NAME)
 
     # virsh define for all servers
     for server in server_names:
@@ -351,11 +391,24 @@ def create():
     # Load balancer config
     config_VM_hostname_interfaces(LOAD_BALANCER_NAME, 'load_balancer')
 
+    # Hosts file config for each VM
+    # Servers
+    for server in server_names:
+        config_hosts(server)
+    
+    config_hosts(CLIENT_NAME)
+    config_hosts(LOAD_BALANCER_NAME)
+
     # Enable ip forwarding for load balancer
     virsh_lb_forwarding_setup()
 
     print("Create successfully")
     virsh_list(inactive=True)
+
+    #sudo ifconfig LAN1 10.0.1.3/24
+    #sudo ip route add 10.0.0.0/16 via 10.0.1.1
+    os.system("sudo ifconfig LAN1 10.0.1.3/24")
+    os.system("sudo ip route add 10.0.0.0/16 via 10.0.1.1")
 
 def start():
     SERVER_NAMES = get_server_names_from_config_file()
@@ -386,12 +439,16 @@ def stop():
     # Stop servers
     for server in SERVER_NAMES:
         virsh_shutdown(server)
+        sleep(1)
     
     # Stop client
     virsh_shutdown(CLIENT_NAME)
+    sleep(1)
+
 
     # Stop load balancer
     virsh_shutdown(LOAD_BALANCER_NAME)
+    sleep(1)
     print("Stop finished")
 
     virsh_list(inactive=True)
@@ -406,7 +463,7 @@ def release():
     # Deletes the environment files creted by the option create
     files_to_delete = get_files_to_delete(CURRENT_PATH)
     for file_name in files_to_delete:
-        call(["rm", file_name])
+        call(["sudo", "rm", file_name])
     print("Files successfully deleted")
 
     virsh_list()
@@ -417,6 +474,9 @@ if __name__ == '__main__':
     ORDER = check_order_input_value(ARGS['order'])
     NSERVERS = check_servers_input_value(ARGS['serversNumber'])
     server_names = []
+
+    if NSERVERS < 1 or NSERVERS > 5:
+        raise Exception("Please specify a number of servers between 1-5")
 
     # Minor bug, it is possible to specify server number if the value is 2
     #optional_without_create()
@@ -430,15 +490,6 @@ if __name__ == '__main__':
     # Reading the config file
     config = open("cp1.cfg", "r")
     NSERVERS = int(config.readlines()[0][-1] )
-
-
-    # loggin config
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger()
-    logger.debug("DEBUG MODE")
-    # Debug trace
-    logger.debug(ORDER)
-    logger.debug(NSERVERS)
 
     # Call the suitable function depending on user ORDER input {create/start/stop/release}
     command_function = ORDER
