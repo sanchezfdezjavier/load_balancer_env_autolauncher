@@ -1,6 +1,8 @@
 # Client-Servers with Load Balancer  KVM environment auto Launcher
 This script, provides a set of shell commands to create and manipulate a KVM client-severs(with load-balancer) environment
 
+<img src="preview.png" width="650px" height="370px">
+
 ## How to run it?
 1. First clone the repo
 2. Change your working directory `cd load_balancer_env_autolauncher`
